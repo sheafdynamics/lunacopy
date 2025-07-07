@@ -1,0 +1,3 @@
+This is another sample file with different content.
+This file will be used for testing directory hashing operations.
+Multiple files are needed to thoroughly test the script.
