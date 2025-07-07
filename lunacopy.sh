@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Version 1.0.1
+# Version 1.0.2 (Bug fixes applied)
 # MIT License
 # Copyright 2025 Ray Doll, https://github.com/sheafdynamics/
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # If any command fails, the script will exit immediately.
 set -e
@@ -32,6 +32,15 @@ fi
 action="$1"
 # Assign the second argument to a variable named 'path'.
 path="$2"
+
+# Validate that the path exists for hash and verify operations
+if [[ "$action" == "hash" || "$action" == "verify" ]]; then
+    if [[ ! -e "$path" ]]; then
+        echo "Error: Path '$path' does not exist."
+        exit 1
+    fi
+fi
+
 # Extract the base name of the path (i.e., the file or directory name) and assign to 'name'.
 name=$(basename "$path")
 
@@ -82,20 +91,21 @@ case $action in
 
                         # Loop over each file in the directory.
                         while IFS= read -r -d '' file; do
-                            filename=$(basename "$file")
-
+                            # Get relative path from the directory being hashed
+                            relative_file="${file#$path/}"
+                            
                             # Check if the file already has a hash in the testfile.
-                            hash=$(grep -wF -- "$filename" "$path/${name}.$ext" | awk '{print $1}')
-                            if [ -n "$hash" ]; then
+                            # Fixed: Use proper escaping and look for the relative path
+                            if grep -qF -- "$relative_file" "$path/${name}.$ext" 2>/dev/null; then
                                 continue
                             fi
 
                             # Calculate the hash for the file.
                             hash=$($hash_command "$file" | awk '{print $1}')
 
-                            # Append the hash and filename to the new_file_hashes variable.
-                            new_file_hashes+="${hash}  ${file}"$'\n'
-                            new_files_to_add+=("$file")
+                            # Append the hash and relative filename to the new_file_hashes variable.
+                            new_file_hashes+="${hash}  ${relative_file}"$'\n'
+                            new_files_to_add+=("$relative_file")
 
                         # This syntax continues the loop for all files in the directory.
                         done < <(find "$path" -type f -not -name "${name}.$ext" -print0)
@@ -126,6 +136,7 @@ case $action in
                             echo "Operation cancelled by the user."
                             exit 1
                         fi
+                        # Continue to create new hash file (fall through)
                         ;;
                     3)
                         # Option to exit without modifying the testfile.
@@ -138,11 +149,12 @@ case $action in
                         exit 1
                         ;;
                 esac
-            else
-                # If no existing testfile, hash the directory content and create a new testfile.
-                find "$path" -type f -not -name "${name}.$ext" -exec $hash_command {} + > "$path"/"${name}.$ext"
-                echo "New testfile \"${name}.$ext\" written successfully."
             fi
+            
+            # Hash the directory content and create a new testfile with relative paths
+            # Change to the directory to ensure relative paths in output
+            (cd "$path" && find . -type f -not -name "${name}.$ext" -exec $hash_command {} + | sed 's|^\([a-f0-9]*\)  \./|\1  |') > "$path"/"${name}.$ext"
+            echo "New testfile \"${name}.$ext\" written successfully."
         else
             # If the provided path is a file.
             # Check if a hash file already exists for the file.
@@ -156,7 +168,8 @@ case $action in
             fi
 
             # Calculate the hash for the file and create or overwrite the testfile.
-            $hash_command "$path" > "${path}.$ext"
+            # Use only the filename, not the full path for single file hashing
+            (cd "$(dirname "$path")" && $hash_command "$(basename "$path")") > "${path}.$ext"
             echo "New testfile \"${name}.$ext\" written successfully."
         fi
         ;;
@@ -200,7 +213,8 @@ case $action in
             fi
 
             # Verify the file hashes against the testfile and capture any errors.
-            errors=$($hash_command -c "$path/$name.$ext" 2>&1 | grep -v ': OK$' 2>/dev/null || true)
+            # Change to the directory to handle relative paths correctly
+            errors=$(cd "$path" && $hash_command -c "$name.$ext" 2>&1 | grep -v ': OK$' 2>/dev/null || true)
         else
             # If the provided path is a file, extract its extension.
             ext="${name##*.}"
@@ -220,62 +234,100 @@ case $action in
                     ;;
             esac
 
+            # Check if the testfile exists
+            if [[ ! -f "$path" ]]; then
+                echo "Error: Testfile \"$path\" not found."
+                exit 1
+            fi
+
             # Verify the file hash against the testfile and capture any errors.
-            errors=$($hash_command -c "$path" 2>&1 | grep -v ': OK$' 2>/dev/null || true)
+            # Change to the directory containing the testfile to handle relative paths
+            errors=$(cd "$(dirname "$path")" && $hash_command -c "$(basename "$path")" 2>&1 | grep -v ': OK$' 2>/dev/null || true)
         fi
 
         # Check if there were any errors during verification.
         if [[ -z "$errors" ]]; then
             echo "All files verified successfully."
             exit 0
-    else
-        # If there were errors, write them to an error log.
-        error_log="${path}/${name}.${ext}.${date}.error.log"
-        echo "$errors" > "$error_log"
-        echo "Verification errors detected. See the error log at: $error_log"
-        exit 1
+        else
+            # If there were errors, write them to an error log.
+            if [[ -d "$path" ]]; then
+                error_log="${path}/${name}.${ext}.${date}.error.log"
+            else
+                error_log="${path}.${date}.error.log"
+            fi
+            echo "$errors" > "$error_log"
+            echo "Verification errors detected. See the error log at: $error_log"
+            exit 1
         fi
         ;;
 
-import)
-    # If the action is 'import', the script will attempt to convert a popular closed-source testfile format to an open LunaCopy format.
+    import)
+        # If the action is 'import', the script will attempt to convert a popular closed-source testfile format to an open LunaCopy format.
 
-    # Extract the extension from the provided path
-    ext="${path##*.}"
+        # Check if the file exists first
+        if [[ ! -f "$path" ]]; then
+            echo "Error: File '$path' does not exist."
+            exit 1
+        fi
 
-    # Check if it's one of the valid extensions
-    if [[ "$ext" != "md5" && "$ext" != "sha256" ]]; then
-        echo "Error: Invalid extension. Only .md5, or .sha256 are allowed."
-        exit 1
-    fi
+        # Extract the extension from the provided path
+        ext="${path##*.}"
 
-    # Prompt the user for confirmation.
-    read -p "This function will attempt to convert a popular closed-source $ext testfile into an open LunaCopy format. Original will be renamed \"filename.$ext.backup\" without any changes, and a new one will be created with the name of the original. Would you like to proceed? (y/n): " confirm
-    if [[ "$confirm" != "y" ]]; then
-        echo "Operation cancelled by the user."
-        exit 1
-    fi
+        # Check if it's one of the valid extensions
+        if [[ "$ext" != "md5" && "$ext" != "sha256" ]]; then
+            echo "Error: Invalid extension. Only .md5, or .sha256 are allowed."
+            exit 1
+        fi
 
-    # Check if the file exists and has the right extension
-    if [[ ! -f "$path" ]]; then
-        echo "Error: File does not exist."
-        exit 1
-    fi
+        # Prompt the user for confirmation.
+        read -p "This function will attempt to convert a popular closed-source $ext testfile into an open LunaCopy format. Original will be renamed \"filename.$ext.backup\" without any changes, and a new one will be created with the name of the original. Would you like to proceed? (y/n): " confirm
+        if [[ "$confirm" != "y" ]]; then
+            echo "Operation cancelled by the user."
+            exit 1
+        fi
 
-    # Rename the original file for backup
-    mv "$path" "${path}.backup"
+        # Rename the original file for backup
+        mv "$path" "${path}.backup"
 
-    # Convert closed-source format to an open LunaCopy format
-    awk 'NR > 3 {
-    hash = $1; # Store the hash
-    gsub(/\\/, "/", $0); # Convert backslashes to forward slashes
-    sub(/^\*|^[a-fA-F0-9]{32,64} \*/, "", $0); # Remove the '*' and hash from the start of filenames
-    print tolower(hash) "  " $0  # Two spaces between hash and filename
-    }' "${path}.backup" > "$path"
+        # Convert closed-source format to an open LunaCopy format
+        # Enhanced awk script to handle more edge cases
+        awk '
+        NR > 3 {
+            # Skip empty lines
+            if (NF == 0) next
+            
+            # Extract hash (first field)
+            hash = $1
+            
+            # Remove hash from the line to get filename
+            $1 = ""
+            filename = substr($0, 2)  # Remove leading space
+            
+            # Convert backslashes to forward slashes
+            gsub(/\\/, "/", filename)
+            
+            # Remove leading asterisk if present
+            gsub(/^\*/, "", filename)
+            
+            # Skip if hash or filename is empty
+            if (length(hash) == 0 || length(filename) == 0) next
+            
+            # Print in LunaCopy format with lowercase hash
+            print tolower(hash) "  " filename
+        }' "${path}.backup" > "$path"
 
-    # Inform the user that the conversion is complete.
-    echo "Conversion complete. Original has been renamed to \"${path}.backup\" and a new LunaCopy testfile file has been created as \"$path\"."
-    ;;
+        # Verify the conversion was successful
+        if [[ ! -s "$path" ]]; then
+            echo "Warning: The converted file appears to be empty. Please check the original format."
+            mv "${path}.backup" "$path"
+            echo "Restoration completed. Original file restored."
+            exit 1
+        fi
+
+        # Inform the user that the conversion is complete.
+        echo "Conversion complete. Original has been renamed to \"${path}.backup\" and a new LunaCopy testfile file has been created as \"$path\"."
+        ;;
     *)
         # If the action is not recognized, call the 'usage' function.
         usage
