@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Version 1.0.2 (Bug fixes applied)
+# Version 1.0.3 (Multiple spaces preservation fix)
 # MIT License
 # Copyright 2025 Ray Doll, https://github.com/sheafdynamics/
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -291,7 +291,7 @@ case $action in
         mv "$path" "${path}.backup"
 
         # Convert closed-source format to an open LunaCopy format
-        # Enhanced awk script to handle more edge cases
+        # Enhanced awk script to handle more edge cases and preserve spaces
         awk '
         NR > 3 {
             # Skip empty lines
@@ -300,15 +300,16 @@ case $action in
             # Extract hash (first field)
             hash = $1
             
-            # Remove hash from the line to get filename
-            $1 = ""
-            filename = substr($0, 2)  # Remove leading space
+            # Get filename by finding position after hash
+            # This preserves all original spacing
+            hash_end = index($0, hash) + length(hash)
+            filename = substr($0, hash_end + 1)
+            
+            # Remove leading spaces/asterisk
+            sub(/^[ \t]*\*?/, "", filename)
             
             # Convert backslashes to forward slashes
             gsub(/\\/, "/", filename)
-            
-            # Remove leading asterisk if present
-            gsub(/^\*/, "", filename)
             
             # Skip if hash or filename is empty
             if (length(hash) == 0 || length(filename) == 0) next
