@@ -496,7 +496,7 @@ teardown() {
 }
 
 @test "import preserves multiple spaces in filenames" {
-    # Create a TeraCopy-style file with multiple spaces
+    # Create a SomethingCopy-style file with multiple spaces
     cat > "spaces.md5" << 'EOF'
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Created by SomethingCopy
