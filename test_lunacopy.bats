@@ -494,3 +494,35 @@ teardown() {
         [[ ! "$filepath" =~ ^\.\/ ]]
     done < "testdir/testdir.md5"
 }
+
+@test "import preserves multiple spaces in filenames" {
+    # Create a TeraCopy-style file with multiple spaces
+    cat > "spaces.md5" << 'EOF'
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Created by SomethingCopy
+; Test file with multiple spaces
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ED56308013E4DFC35508C9F194C947AA *Pro\School\Classes\FINE 332\Module 2\Brazilians  Build, Trade Maid 'Routes'.pdf
+D41D8CD98F00B204E9800998ECF8427E *file   with    multiple     spaces.txt
+5D41402ABC4B2A76B9719D911017C592 *normal_file.txt
+EOF
+    
+    # Import the file
+    run bash -c "echo 'y' | '$LUNACOPY_SCRIPT' import 'spaces.md5'"
+    [ "$status" -eq 0 ]
+    
+    # Check that multiple spaces are preserved in "Brazilians  Build"
+    run grep "Brazilians  Build" "spaces.md5"
+    [ "$status" -eq 0 ]
+    
+    # Check that multiple spaces are preserved in other file
+    run grep "file   with    multiple     spaces.txt" "spaces.md5"
+    [ "$status" -eq 0 ]
+    
+    # Verify correct hash format (lowercase)
+    run grep -E "^ed56308013e4dfc35508c9f194c947aa  " "spaces.md5"
+    [ "$status" -eq 0 ]
+    
+    # Clean up
+    rm -f "spaces.md5" "spaces.md5.backup"
+}
