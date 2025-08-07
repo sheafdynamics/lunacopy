@@ -1,2 +1,0 @@
-This is a sample file for testing LunaCopy functionality.
-It contains some text content that will be used to generate and verify hashes.
