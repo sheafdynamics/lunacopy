@@ -2,14 +2,11 @@
 <h1>lunacopy.sh 🌙</h1>
 
 <p>Linux file integrity testing automation script</p>
-<p><strong>Version 1.0.2 - Production Ready</strong></p>
 </div>
 
 ---
 
-An open-source Linux bash script alternative to a popular Redmond closed-source file hash utility that people use to replace file explorer copy operations. LunaCopy focuses solely on the file hashing aspect and introduces new features to make it easier to manage hash list testfiles.
-
-**✅ Fully tested and verified** - This script has undergone comprehensive bug fixing and automated testing to ensure reliability and safety.
+An open-source Linux bash script alternative to a popular closed-source file hash utility that people use to replace file explorer copy operations. LunaCopy focuses solely on the file hashing aspect and introduces new features to make it easier to manage hash list testfiles.
 
 See the [Man Page](#man-page) further down this page for details.
 
@@ -31,7 +28,6 @@ Project Goals
 ----------------
 ### Stability ✅
 * Leverage built-in Linux software for reliability and accuracy (md5sum, sha256sum).
-* **Production-ready with comprehensive bug fixes and testing**
 ### Openness ✅
 * Ability to import existing closed-source format testfiles and save them in an open format.
 * Standardize formats and processes with user operation in mind.
@@ -40,19 +36,11 @@ Project Goals
 ### Ease of use ✅
 * Avoid using Python to simplify troubleshooting and installation. 
 * Append testfiles with new files without re-hashing existing files.
-* **Comprehensive automated testing suite ensures reliable operation**
+* Comprehensive automated testing suite ensures reliable operation
 
 Solving File Integrity on Linux
 -------------
 LunaCopy can hash and verify thousands of files for checksum integrity by writing and checking text files. LunaCopy's functionality is too vast for a single line of bash script but is not complex to warrant a rewrite as a command line utility.
-
-**Version 1.0.2 includes critical bug fixes and comprehensive testing:**
-- Fixed path handling in append mode
-- Improved relative path consistency  
-- Enhanced import function robustness
-- Added comprehensive input validation
-- 37 automated tests validate all functionality
-- Complete security audit confirms safety
 
 Flow Chart
 --------
@@ -118,8 +106,7 @@ Linux                              AUGUST 2023                         LUNACOPY(
 Testing & Quality Assurance
 ---------------------------
 
-**✅ Comprehensive Testing Suite**
-- **37 automated tests** covering all functionality
+- **38 automated tests** covering all functionality
 - **Manual test runner** for additional validation  
 - **Edge case testing** including special characters, spaces, and error conditions
 - **Security audit** confirms scripts are safe for host systems
@@ -151,10 +138,14 @@ brew install bats-core     # macOS
 Changelog
 ---------
 
-*Short changelog - for all the details look at the git log.*
-
-**v1.0.2, 2025-01-07** ⭐ **MAJOR RELEASE**
-* **BREAKING**: Fixed critical bugs affecting reliability
+v1.0.3, 2025-08-07
+* Fixed multiple spaces preservation bug in import (v1.0.3)
+* Fixed import function to preserve multiple consecutive spaces in filenames
+* Added test case to verify space preservation
+* Updated to 38 total tests
+  
+v1.0.2, 2025-07-01
+* Fixed critical bugs affecting reliability
 * Fixed: Path handling in append mode with proper grep matching
 * Fixed: Verification logic indentation and flow control
 * Fixed: Relative path handling consistency across operations
@@ -164,7 +155,6 @@ Changelog
 * Added: 37 comprehensive automated tests (BATS framework)
 * Added: Manual test runner as backup validation
 * Added: Complete security audit and safety verification
-* **STATUS**: Production ready - all tests passing
 
 v1.0.1, 2023-08-26
 * Fixed: grep unexpected argument during new file append
